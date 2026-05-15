@@ -1,0 +1,9 @@
+Name,Latitude,Longitude,Oil Company,Status,Station Code,Tarpaulin,DOE Remarks,Province,Municipality
+Caltex Koronadal Main,6.4735,124.8003,Caltex,participating,DOE-001,Y,None,South Cotabato,Koronadal
+Shell Tacurong,6.2849,124.7605,Shell,participating,DOE-002,Y,Compliant,Sultan Kudarat,Tacurong
+Petron GenSan,6.1146,125.1834,Petron,participating,DOE-003,Y,None,General Santos,Dadiangas
+Chevron Isulan,6.6411,124.5699,Chevron,issues,DOE-004,N,Tarpaulin missing,Sultan Kudarat,Isulan
+Caltex Alabel,5.9414,125.3181,Caltex,participating,DOE-005,Y,None,Sarangani,Alabel
+Petron Surallah,6.5689,124.5342,Petron,closed,DOE-006,N,Operations suspended,South Cotabato,Surallah
+Shell Kidapawan,6.8500,124.8464,Shell,participating,DOE-007,Y,Compliant,North Cotabato,Kidapawan
+Caltex Marbel,6.6342,124.8169,Caltex,issues,DOE-008,Y,Incomplete registration,South Cotabato,Marbel
