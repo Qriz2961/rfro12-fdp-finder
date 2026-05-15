@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RFRO XII FDP Gas Station Finder</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif; background: #f5f5f5; color: #1a1a1a; }
+    .container { display: grid; grid-template-columns: 280px 1fr 320px; height: 100vh; gap: 0; background: white; }
+    .panel { border-right: 1px solid #e0e0e0; overflow-y: auto; padding: 1.5rem; }
+    .panel-left { background: #fafafa; }
+    .panel-map { padding: 0; position: relative; }
+    .panel-right { border-right: none; background: white; }
+    h2 { font-size: 16px; font-weight: 600; margin-bottom: 1rem; color: #1a1a1a; display: flex; align-items: center; gap: 0.5rem; }
+    h3 { font-size: 14px; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #1a1a1a; }
+    .upload-zone { border: 2px dashed #ccc; border-radius: 8px; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; background: white; }
+    .upload-zone:hover { border-color: #0066cc; background: #f0f8ff; }
+    .upload-zone.active { border-color: #00b359; background: #f0fff4; }
+    .upload-zone i { font-size: 28px; color: #999; margin-bottom: 0.5rem; }
+    .upload-zone p { font-size: 12px; color: #666; margin-top: 0.5rem; }
+    input[type="file"] { display: none; }
+    .filter-group { margin-bottom: 1.5rem; }
+    .filter-label { font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 0.5rem; display: block; letter-spacing: 0.5px; }
+    select, input[type="text"], input[type="number"], input[type="range"] { width: 100%; padding: 0.5rem; border: 1px solid #d0d0d0; border-radius: 6px; font-size: 13px; background: white; color: #1a1a1a; margin-bottom: 0.75rem; }
+    select:focus, input:focus { outline: none; border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1); }
+    #map { width: 100%; height: 100%; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1.5rem; }
+    .stat-card { background: #fafafa; padding: 1rem; border-radius: 8px; border: 1px solid #e0e0e0; }
+    .stat-label { font-size: 11px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-value { font-size: 24px; font-weight: 700; margin-top: 0.5rem; color: #1a1a1a; }
+    .station-detail { background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .station-name { font-weight: 600; font-size: 14px; margin-bottom: 0.5rem; color: #1a1a1a; }
+    .station-meta { font-size: 12px; color: #666; margin-bottom: 0.75rem; line-height: 1.6; }
+    .status-badge { display: inline-block; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; margin-bottom: 0.75rem; }
+    .status-participating { background: #d4f4dd; color: #1b6e3f; }
+    .status-issues { background: #fff4e6; color: #cc7000; }
+    .status-closed { background: #ffe6e6; color: #cc0000; }
+    .status-undecided { background: #e6f2ff; color: #0052cc; }
+    button { padding: 0.5rem 1rem; border: 1px solid #d0d0d0; border-radius: 6px; background: white; color: #1a1a1a; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; margin-top: 0.5rem; }
+    button:hover { background: #f5f5f5; border-color: #999; }
+    button:active { transform: scale(0.98); }
+    button.primary { background: #0066cc; color: white; border-color: #0066cc; }
+    button.primary:hover { background: #0052a3; }
+    .edit-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e0e0e0; }
+    .edit-form input, .edit-form select { width: 100%; margin-bottom: 0.75rem; }
+    .btn-group { display: flex; gap: 0.5rem; }
+    .btn-group button { flex: 1; margin-top: 0; }
+    .data-status { font-size: 12px; color: #1b6e3f; padding: 1rem; background: #d4f4dd; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #00b359; }
+    .data-status i { margin-right: 0.5rem; }
+    .checkbox-group { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .checkbox-group input[type="checkbox"] { width: auto; margin-bottom: 0; }
+    .checkbox-group label { font-size: 13px; margin-bottom: 0; }
+    @media (max-width: 1200px) { 
+      .container { grid-template-columns: 1fr; height: auto; } 
+      .panel { border-right: none; border-bottom: 1px solid #e0e0e0; max-height: none; }
+      #map { height: 400px; }
+    }
+    .logo { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #e0e0e0; }
+    .logo strong { color: #0066cc; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- PANEL 1: UPLOAD & FILTERS -->
+    <div class="panel panel-left">
+      <div class="logo">
+        <i class="fas fa-gas-pump" style="font-size: 20px; color: #0066cc;"></i>
+        <strong>FDP Finder</strong>
+      </div>
+      
+      <h2><i class="fas fa-cloud-upload-alt"></i> Upload Data</h2>
+      
+      <div class="upload-zone" id="uploadZone">
+        <i class="fas fa-file-upload"></i>
+        <p><strong>Drop files here</strong><br>or click to select</p>
+        <p style="font-size: 11px; margin-top: 0.75rem; color: #999;">CSV or Excel (XLSX)<br>Gas Stations • Routes • DOE Tracker</p>
+      </div>
+      <input type="file" id="fileInput" multiple accept=".csv,.xlsx,.xls">
+      
+      <div class="data-status" id="dataStatus" style="display: none;">
+        <i class="fas fa-check-circle"></i> <span id="dataStatusText">0 stations loaded</span>
+      </div>
+
+      <h3>Filters</h3>
+      
+      <div class="filter-group">
+        <label class="filter-label">Province</label>
+        <select id="provinceFilter">
+          <option value="">All Provinces</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Municipality</label>
+        <select id="municipalityFilter">
+          <option value="">All Municipalities</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Status</label>
+        <select id="statusFilter">
+          <option value="">All Status</option>
+          <option value="participating">Participating</option>
+          <option value="issues">With Issues</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Oil Company</label>
+        <select id="oilCompanyFilter">
+          <option value="">All Companies</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Radius (km)</label>
+        <input type="range" id="radiusSlider" min="1" max="50" value="15" />
+        <div style="font-size: 12px; color: #666;">Search radius: <strong id="radiusValue">15 km</strong></div>
+      </div>
+
+      <button onclick="resetFilters()" style="width: 100%;"><i class="fas fa-redo"></i> Reset Filters</button>
+    </div>
+
+    <!-- PANEL 2: MAP -->
+    <div class="panel panel-map">
+      <div id="map"></div>
+    </div>
+
+    <!-- PANEL 3: DETAILS & EDIT -->
+    <div class="panel panel-right">
+      <h2><i class="fas fa-info-circle"></i> Details</h2>
+      
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-label">Total</div>
+          <div class="stat-value" id="totalStations">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active</div>
+          <div class="stat-value" id="participatingCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Issues</div>
+          <div class="stat-value" id="issuesCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Closed</div>
+          <div class="stat-value" id="closedCount">0</div>
+        </div>
+      </div>
+
+      <div id="stationDetails">
+        <p style="color: #999; font-size: 13px; text-align: center; padding: 2rem 0;"><i class="fas fa-map-marker-alt"></i><br>Click a marker on the map</p>
+      </div>
+
+      <h3>Add Station</h3>
+      <div class="edit-form">
+        <input type="text" id="newStationName" placeholder="Station Name" />
+        <input type="text" id="newStationOilCo" placeholder="Oil Company" />
+        <input type="number" id="newStationLat" placeholder="Latitude" step="0.0001" />
+        <input type="number" id="newStationLng" placeholder="Longitude" step="0.0001" />
+        <input type="text" id="newStationCode" placeholder="Station Code (optional)" />
+        <select id="newStationStatus">
+          <option value="participating">Participating</option>
+          <option value="issues">With Issues</option>
+          <option value="closed">Closed</option>
+        </select>
+        <div class="checkbox-group">
+          <input type="checkbox" id="newStationTarpaulin">
+          <label for="newStationTarpaulin">Posted Tarpaulin</label>
+        </div>
+        <div class="btn-group">
+          <button onclick="addNewStation()" class="primary"><i class="fas fa-plus"></i> Add</button>
+          <button onclick="exportData()"><i class="fas fa-download"></i> Export</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script>
+    let stations = [];
+    let map = null;
+    let markers = [];
+    let filteredStations = [];
+
+    function initMap() {
+      if (map) map.remove();
+      map = L.map('map').setView([6.5243, 124.8008], 8);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19
+      }).addTo(map);
+    }
+
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+
+    uploadZone.addEventListener('click', () => fileInput.click());
+    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('active'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('active'));
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('active');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    function handleFiles(files) {
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => parseData(e.target.result, file.name);
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function parseData(data, filename) {
+      try {
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet);
+        
+        json.forEach(row => {
+          if (row.Latitude && row.Longitude) {
+            stations.push({
+              id: Math.random().toString(36).substr(2, 9),
+              name: row.Name || row['Station Name'] || 'Unknown',
+              lat: parseFloat(row.Latitude),
+              lng: parseFloat(row.Longitude),
+              oilCompany: row['Oil Company'] || row.OilCompany || '',
+              status: row.Status || 'participating',
+              stationCode: row['Station Code'] || row.StationCode || '',
+              tarpaulin: row.Tarpaulin === 'Y' || row.Tarpaulin === true || row.Tarpaulin === 1,
+              doeRemarks: row['DOE Remarks'] || row.DOERemarks || '',
+              province: row.Province || '',
+              municipality: row.Municipality || ''
+            });
+          }
+        });
+
+        stations = stations.filter((s, i, a) => a.findIndex(t => t.lat === s.lat && t.lng === s.lng && t.name === s.name) === i);
+        
+        updateFilters();
+        applyFilters();
+        updateStats();
+        
+        const statusEl = document.getElementById('dataStatus');
+        statusEl.style.display = 'block';
+        document.getElementById('dataStatusText').textContent = `✓ ${stations.length} stations loaded`;
+      } catch (err) {
+        alert('Error parsing file: ' + err.message);
+      }
+    }
+
+    function updateFilters() {
+      const provinces = [...new Set(stations.map(s => s.province).filter(Boolean))].sort();
+      const municipalities = [...new Set(stations.map(s => s.municipality).filter(Boolean))].sort();
+      const oilCos = [...new Set(stations.map(s => s.oilCompany).filter(Boolean))].sort();
+      
+      const provinceSelect = document.getElementById('provinceFilter');
+      const municipalitySelect = document.getElementById('municipalityFilter');
+      const oilCoSelect = document.getElementById('oilCompanyFilter');
+      
+      const currentProvince = provinceSelect.value;
+      const currentMun = municipalitySelect.value;
+      const currentOil = oilCoSelect.value;
+
+      while (provinceSelect.children.length > 1) provinceSelect.removeChild(provinceSelect.lastChild);
+      while (municipalitySelect.children.length > 1) municipalitySelect.removeChild(municipalitySelect.lastChild);
+      while (oilCoSelect.children.length > 1) oilCoSelect.removeChild(oilCoSelect.lastChild);
+
+      provinces.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        provinceSelect.appendChild(opt);
+      });
+
+      municipalities.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        municipalitySelect.appendChild(opt);
+      });
+
+      oilCos.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o;
+        opt.textContent = o;
+        oilCoSelect.appendChild(opt);
+      });
+
+      provinceSelect.value = currentProvince;
+      municipalitySelect.value = currentMun;
+      oilCoSelect.value = currentOil;
+    }
+
+    function applyFilters() {
+      const province = document.getElementById('provinceFilter').value;
+      const municipality = document.getElementById('municipalityFilter').value;
+      const status = document.getElementById('statusFilter').value;
+      const oilCompany = document.getElementById('oilCompanyFilter').value;
+
+      filteredStations = stations.filter(s => {
+        return (!province || s.province === province) &&
+               (!municipality || s.municipality === municipality) &&
+               (!status || s.status === status) &&
+               (!oilCompany || s.oilCompany === oilCompany);
+      });
+
+      renderMap();
+      updateStats();
+    }
+
+    function renderMap() {
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+
+      filteredStations.forEach(station => {
+        const colors = { 'participating': '#00b359', 'issues': '#ffaa00', 'closed': '#cc0000' };
+        const color = colors[station.status] || '#0066cc';
+        
+        const marker = L.circleMarker([station.lat, station.lng], {
+          radius: 8,
+          fillColor: color,
+          color: 'white',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.85
+        }).addTo(map);
+
+        marker.on('click', () => showStationDetails(station));
+        markers.push(marker);
+      });
+
+      if (markers.length > 0) {
+        const bounds = L.latLngBounds(filteredStations.map(s => [s.lat, s.lng]));
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    }
+
+    function showStationDetails(station) {
+      const statusClass = 'status-' + station.status;
+      const details = `
+        <div class="station-detail">
+          <div class="station-name">${station.name}</div>
+          <span class="status-badge ${statusClass}">${station.status.replace(/_/g, ' ')}</span>
+          <div class="station-meta">
+            <div><strong>Oil Company:</strong> ${station.oilCompany || 'N/A'}</div>
+            <div><strong>Station Code:</strong> ${station.stationCode || 'N/A'}</div>
+            <div><strong>Lat/Lng:</strong> ${station.lat.toFixed(4)}, ${station.lng.toFixed(4)}</div>
+            <div><strong>Tarpaulin:</strong> ${station.tarpaulin ? '✓ Yes' : '✗ No'}</div>
+            <div><strong>DOE Remarks:</strong> ${station.doeRemarks || 'None'}</div>
+            <div><strong>Province:</strong> ${station.province || 'N/A'}</div>
+            <div><strong>Municipality:</strong> ${station.municipality || 'N/A'}</div>
+          </div>
+          <div class="btn-group">
+            <button onclick="editStation('${station.id}')"><i class="fas fa-edit"></i> Edit</button>
+            <button onclick="deleteStation('${station.id}')"><i class="fas fa-trash"></i> Delete</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('stationDetails').innerHTML = details;
+    }
+
+    function editStation(id) {
+      const station = stations.find(s => s.id === id);
+      if (!station) return;
+
+      const form = `
+        <div class="edit-form">
+          <input type="text" id="edit-name" value="${station.name}" placeholder="Name" />
+          <input type="text" id="edit-oilco" value="${station.oilCompany}" placeholder="Oil Company" />
+          <input type="text" id="edit-code" value="${station.stationCode}" placeholder="Station Code" />
+          <input type="number" id="edit-lat" value="${station.lat}" step="0.0001" placeholder="Latitude" />
+          <input type="number" id="edit-lng" value="${station.lng}" step="0.0001" placeholder="Longitude" />
+          <select id="edit-status">
+            <option value="participating" ${station.status === 'participating' ? 'selected' : ''}>Participating</option>
+            <option value="issues" ${station.status === 'issues' ? 'selected' : ''}>With Issues</option>
+            <option value="closed" ${station.status === 'closed' ? 'selected' : ''}>Closed</option>
+          </select>
+          <div class="checkbox-group">
+            <input type="checkbox" id="edit-tarp" ${station.tarpaulin ? 'checked' : ''}>
+            <label for="edit-tarp">Posted Tarpaulin</label>
+          </div>
+          <input type="text" id="edit-doe" value="${station.doeRemarks}" placeholder="DOE Remarks" />
+          <input type="text" id="edit-province" value="${station.province}" placeholder="Province" />
+          <input type="text" id="edit-municipality" value="${station.municipality}" placeholder="Municipality" />
+          <div class="btn-group">
+            <button onclick="saveEdit('${id}')" class="primary"><i class="fas fa-save"></i> Save</button>
+            <button onclick="applyFilters()">Cancel</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('stationDetails').innerHTML = form;
+    }
+
+    function saveEdit(id) {
+      const station = stations.find(s => s.id === id);
+      if (station) {
+        station.name = document.getElementById('edit-name').value;
+        station.oilCompany = document.getElementById('edit-oilco').value;
+        station.stationCode = document.getElementById('edit-code').value;
+        station.lat = parseFloat(document.getElementById('edit-lat').value);
+        station.lng = parseFloat(document.getElementById('edit-lng').value);
+        station.status = document.getElementById('edit-status').value;
+        station.tarpaulin = document.getElementById('edit-tarp').checked;
+        station.doeRemarks = document.getElementById('edit-doe').value;
+        station.province = document.getElementById('edit-province').value;
+        station.municipality = document.getElementById('edit-municipality').value;
+        applyFilters();
+        showStationDetails(station);
+      }
+    }
+
+    function deleteStation(id) {
+      if (confirm('Delete this station?')) {
+        stations = stations.filter(s => s.id !== id);
+        applyFilters();
+      }
+    }
+
+    function addNewStation() {
+      const name = document.getElementById('newStationName').value;
+      const oilCo = document.getElementById('newStationOilCo').value;
+      const lat = parseFloat(document.getElementById('newStationLat').value);
+      const lng = parseFloat(document.getElementById('newStationLng').value);
+      const code = document.getElementById('newStationCode').value;
+      const status = document.getElementById('newStationStatus').value;
+      const tarpaulin = document.getElementById('newStationTarpaulin').checked;
+
+      if (!name || !oilCo || !lat || !lng) {
+        alert('Please fill: Station Name, Oil Company, Latitude, Longitude');
+        return;
+      }
+
+      stations.push({
+        id: Math.random().toString(36).substr(2, 9),
+        name, oilCompany: oilCo, lat, lng, stationCode: code,
+        status, tarpaulin, doeRemarks: '', province: '', municipality: ''
+      });
+
+      document.getElementById('newStationName').value = '';
+      document.getElementById('newStationOilCo').value = '';
+      document.getElementById('newStationLat').value = '';
+      document.getElementById('newStationLng').value = '';
+      document.getElementById('newStationCode').value = '';
+      document.getElementById('newStationTarpaulin').checked = false;
+
+      applyFilters();
+      alert('Station added!');
+    }
+
+    function exportData() {
+      if (stations.length === 0) {
+        alert('No stations to export');
+        return;
+      }
+      const csv = 'Name,Latitude,Longitude,Oil Company,Status,Station Code,Tarpaulin,DOE Remarks,Province,Municipality\n' +
+        stations.map(s => `"${s.name}",${s.lat},${s.lng},"${s.oilCompany}","${s.status}","${s.stationCode}","${s.tarpaulin ? 'Y' : 'N'}","${s.doeRemarks}","${s.province}","${s.municipality}"`).join('\n');
+      
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'fdp-stations-' + new Date().toISOString().slice(0, 10) + '.csv';
+      link.click();
+    }
+
+    function resetFilters() {
+      document.getElementById('provinceFilter').value = '';
+      document.getElementById('municipalityFilter').value = '';
+      document.getElementById('statusFilter').value = '';
+      document.getElementById('oilCompanyFilter').value = '';
+      document.getElementById('radiusSlider').value = 15;
+      document.getElementById('radiusValue').textContent = '15 km';
+      applyFilters();
+    }
+
+    function updateStats() {
+      document.getElementById('totalStations').textContent = filteredStations.length;
+      document.getElementById('participatingCount').textContent = filteredStations.filter(s => s.status === 'participating').length;
+      document.getElementById('issuesCount').textContent = filteredStations.filter(s => s.status === 'issues').length;
+      document.getElementById('closedCount').textContent = filteredStations.filter(s => s.status === 'closed').length;
+    }
+
+    document.getElementById('provinceFilter').addEventListener('change', applyFilters);
+    document.getElementById('municipalityFilter').addEventListener('change', applyFilters);
+    document.getElementById('statusFilter').addEventListener('change', applyFilters);
+    document.getElementById('oilCompanyFilter').addEventListener('change', applyFilters);
+    document.getElementById('radiusSlider').addEventListener('input', (e) => {
+      document.getElementById('radiusValue').textContent = e.target.value + ' km';
+      applyFilters();
+    });
+
+    initMap();
+  </script>
+</body>
+</html>
